@@ -29,7 +29,13 @@ import { toast } from "sonner";
 
 const Calendar = () => {
   const { user } = useAuth();
-  const { events, createEvent, deleteEvent } = useCalendarStore(user?.id);
+  const {
+    events,
+    createEvent,
+    deleteEvent,
+    getOverlappingHangouts,
+    checkEventOverlap,
+  } = useCalendarStore(user?.id);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [showEventModal, setShowEventModal] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
@@ -182,6 +188,8 @@ const Calendar = () => {
           events={events}
           onDateSelect={handleDateSelect}
           onEventClick={handleEventClick}
+          getOverlappingHangouts={getOverlappingHangouts}
+          checkEventOverlap={checkEventOverlap}
           selectedDate={selectedDate}
         />
 

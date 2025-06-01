@@ -65,27 +65,46 @@ export const CalendarView = ({
   };
 
   const renderEventBadge = (event: Event) => {
+    const hasOverlap =
+      event.type === "hangout" &&
+      checkEventOverlap &&
+      checkEventOverlap(event.id);
+
     return (
       <div
         key={event.id}
         onClick={(e) => {
           e.stopPropagation();
-          onEventClick(event);
+
+          // If it's a hangout with overlap, show the overlap modal
+          if (hasOverlap && event.type === "hangout") {
+            setSelectedOverlap(hasOverlap);
+            setShowOverlapModal(true);
+          } else {
+            onEventClick(event);
+          }
         }}
         className={cn(
-          "text-xs p-1 mb-1 rounded cursor-pointer hover:opacity-80 transition-opacity",
-          event.type === "hangout"
-            ? "bg-blue-100 text-blue-800 border border-blue-200"
-            : "bg-gray-100 text-gray-800 border border-gray-200",
+          "text-xs p-1 mb-1 rounded cursor-pointer hover:opacity-80 transition-all duration-200",
+          event.type === "hangout" && hasOverlap
+            ? "bg-gradient-to-r from-green-100 to-blue-100 text-green-800 border-2 border-green-300 shadow-md animate-pulse"
+            : event.type === "hangout"
+              ? "bg-blue-100 text-blue-800 border border-blue-200"
+              : "bg-gray-100 text-gray-800 border border-gray-200",
         )}
       >
         <div className="flex items-center space-x-1">
-          {event.type === "hangout" ? (
+          {event.type === "hangout" && hasOverlap ? (
+            <Users className="h-3 w-3 text-green-600" />
+          ) : event.type === "hangout" ? (
             <MapPin className="h-3 w-3" />
           ) : (
             <CalendarIcon className="h-3 w-3" />
           )}
           <span className="truncate">{event.title}</span>
+          {hasOverlap && (
+            <span className="text-green-600 font-semibold">!</span>
+          )}
         </div>
       </div>
     );
@@ -289,6 +308,16 @@ export const CalendarView = ({
           </CardContent>
         </Card>
       </div>
+
+      {/* Hangout Overlap Modal */}
+      <HangoutOverlapModal
+        open={showOverlapModal}
+        onOpenChange={setShowOverlapModal}
+        userEvent={selectedOverlap?.userEvent || null}
+        friendEvent={selectedOverlap?.friendEvent || null}
+        friend={selectedOverlap?.friend || null}
+        overlapTime={selectedOverlap?.overlap || null}
+      />
     </div>
   );
 };

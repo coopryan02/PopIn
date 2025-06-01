@@ -245,6 +245,97 @@ export const useCalendarStore = (userId?: string) => {
     return friendHangouts;
   };
 
+  const getOverlappingHangouts = (targetDate: Date) => {
+    if (!userId) return [];
+
+    const currentUser = userStorage.getCurrentUser();
+    if (!currentUser) return [];
+
+    const allEvents = eventStorage.getEvents();
+    const userHangouts = allEvents.filter(
+      (event) => event.userId === userId && event.type === "hangout",
+    ) as HangoutEvent[];
+
+    const friends = userStorage
+      .getUsers()
+      .filter((user) => currentUser.friends.includes(user.id));
+
+    const overlaps: Array<{
+      userEvent: HangoutEvent;
+      friendEvent: HangoutEvent;
+      friend: User;
+      overlap: { start: string; end: string };
+    }> = [];
+
+    userHangouts.forEach((userEvent) => {
+      // Check if this event is on the target date
+      const eventDate = new Date(userEvent.startTime);
+      if (
+        eventDate.getDate() === targetDate.getDate() &&
+        eventDate.getMonth() === targetDate.getMonth() &&
+        eventDate.getFullYear() === targetDate.getFullYear()
+      ) {
+        friends.forEach((friend) => {
+          const friendHangouts = allEvents.filter(
+            (event) => event.userId === friend.id && event.type === "hangout",
+          ) as HangoutEvent[];
+
+          friendHangouts.forEach((friendEvent) => {
+            const overlap = getTimeOverlap(userEvent, friendEvent);
+            if (overlap) {
+              overlaps.push({
+                userEvent,
+                friendEvent,
+                friend,
+                overlap,
+              });
+            }
+          });
+        });
+      }
+    });
+
+    return overlaps;
+  };
+
+  const checkEventOverlap = (eventId: string) => {
+    if (!userId) return null;
+
+    const currentUser = userStorage.getCurrentUser();
+    if (!currentUser) return null;
+
+    const allEvents = eventStorage.getEvents();
+    const targetEvent = allEvents.find(
+      (e) => e.id === eventId && e.type === "hangout",
+    ) as HangoutEvent;
+
+    if (!targetEvent || targetEvent.userId !== userId) return null;
+
+    const friends = userStorage
+      .getUsers()
+      .filter((user) => currentUser.friends.includes(user.id));
+
+    for (const friend of friends) {
+      const friendHangouts = allEvents.filter(
+        (event) => event.userId === friend.id && event.type === "hangout",
+      ) as HangoutEvent[];
+
+      for (const friendEvent of friendHangouts) {
+        const overlap = getTimeOverlap(targetEvent, friendEvent);
+        if (overlap) {
+          return {
+            userEvent: targetEvent,
+            friendEvent,
+            friend,
+            overlap,
+          };
+        }
+      }
+    }
+
+    return null;
+  };
+
   return {
     events,
     isLoading,
@@ -255,6 +346,8 @@ export const useCalendarStore = (userId?: string) => {
     getFriendHangouts,
     getHangoutMatches,
     getAllFriendHangouts,
+    getOverlappingHangouts,
+    checkEventOverlap,
     loadEvents,
   };
 };
