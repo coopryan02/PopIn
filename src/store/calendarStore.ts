@@ -20,9 +20,9 @@ export const useCalendarStore = (userId?: string) => {
 
   useEffect(() => {
     loadEvents();
-  }, [userId]);
+  }, [loadEvents]);
 
-  const loadEvents = () => {
+  const loadEvents = useCallback(() => {
     setIsLoading(true);
     const allEvents = eventStorage.getEvents();
     const userEvents = userId
@@ -30,7 +30,7 @@ export const useCalendarStore = (userId?: string) => {
       : [];
     setEvents(userEvents);
     setIsLoading(false);
-  };
+  }, [userId]);
 
   const createEvent = (eventData: CreateEventInput): Event => {
     if (!userId) throw new Error("User ID is required");
