@@ -28,6 +28,10 @@ export const useCalendarStore = (userId?: string) => {
     setIsLoading(false);
   }, [userId]);
 
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
+
   const createEvent = (eventData: CreateEventInput): Event => {
     if (!userId) throw new Error("User ID is required");
 
