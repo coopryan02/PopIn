@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Event,
   HangoutEvent,
@@ -17,10 +17,6 @@ import { generateId } from "@/utils/auth";
 export const useCalendarStore = (userId?: string) => {
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    loadEvents();
-  }, [loadEvents]);
 
   const loadEvents = useCallback(() => {
     setIsLoading(true);
