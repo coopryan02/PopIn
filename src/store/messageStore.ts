@@ -13,9 +13,9 @@ export const useMessageStore = (userId?: string) => {
 
   useEffect(() => {
     loadConversations();
-  }, [userId]);
+  }, [loadConversations]);
 
-  const loadConversations = () => {
+  const loadConversations = useCallback(() => {
     if (!userId) {
       setConversations([]);
       setIsLoading(false);
@@ -36,7 +36,7 @@ export const useMessageStore = (userId?: string) => {
 
     setConversations(userConversations);
     setIsLoading(false);
-  };
+  }, [userId]);
 
   const sendMessage = (receiverId: string, content: string): Message => {
     if (!userId) throw new Error("User ID is required");
