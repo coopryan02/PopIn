@@ -13,6 +13,7 @@ import Dashboard from "./pages/Dashboard";
 import Calendar from "./pages/Calendar";
 import Messages from "./pages/Messages";
 import Friends from "./pages/Friends";
+import FriendHangouts from "./pages/FriendHangouts";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
@@ -75,6 +76,14 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <Friends />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/friend-hangouts"
+        element={
+          <ProtectedRoute>
+            <FriendHangouts />
           </ProtectedRoute>
         }
       />
