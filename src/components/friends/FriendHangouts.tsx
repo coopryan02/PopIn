@@ -24,6 +24,9 @@ interface FriendHangoutsProps {
 }
 
 export const FriendHangouts = ({ friendHangouts }: FriendHangoutsProps) => {
+  // Safety check for undefined or null friendHangouts
+  const safeFriendHangouts = friendHangouts || [];
+
   const getInitials = (name: string) => {
     return name
       .split(" ")
@@ -48,7 +51,7 @@ export const FriendHangouts = ({ friendHangouts }: FriendHangoutsProps) => {
     }
   };
 
-  const upcomingHangouts = friendHangouts.filter(
+  const upcomingHangouts = safeFriendHangouts.filter(
     ({ event }) => new Date(event.startTime) > new Date(),
   );
 
