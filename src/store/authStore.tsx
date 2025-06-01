@@ -122,7 +122,7 @@ const useAuthStore = () => {
   const updateUser = (user: User) => {
     userStorage.updateUser(user);
     userStorage.setCurrentUser(user);
-    setState((prev) => ({ ...prev, user }));
+    setState((prev) => ({ ...prev, user: { ...user } }));
   };
 
   return {
