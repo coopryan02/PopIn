@@ -37,17 +37,27 @@ export const FriendHangouts = ({ friendHangouts }: FriendHangoutsProps) => {
   };
 
   const formatEventTime = (startTime: string, endTime: string) => {
-    const start = new Date(startTime);
-    const end = new Date(endTime);
+    try {
+      const start = new Date(startTime);
+      const end = new Date(endTime);
 
-    if (isToday(start)) {
-      return `Today ${format(start, "h:mm a")} - ${format(end, "h:mm a")}`;
-    } else if (isTomorrow(start)) {
-      return `Tomorrow ${format(start, "h:mm a")} - ${format(end, "h:mm a")}`;
-    } else if (isThisWeek(start)) {
-      return `${format(start, "EEEE h:mm a")} - ${format(end, "h:mm a")}`;
-    } else {
-      return `${format(start, "MMM d, h:mm a")} - ${format(end, "h:mm a")}`;
+      // Check for invalid dates
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return "Invalid date";
+      }
+
+      if (isToday(start)) {
+        return `Today ${format(start, "h:mm a")} - ${format(end, "h:mm a")}`;
+      } else if (isTomorrow(start)) {
+        return `Tomorrow ${format(start, "h:mm a")} - ${format(end, "h:mm a")}`;
+      } else if (isThisWeek(start)) {
+        return `${format(start, "EEEE h:mm a")} - ${format(end, "h:mm a")}`;
+      } else {
+        return `${format(start, "MMM d, h:mm a")} - ${format(end, "h:mm a")}`;
+      }
+    } catch (error) {
+      console.error("Error formatting event time:", error);
+      return "Invalid time";
     }
   };
 
