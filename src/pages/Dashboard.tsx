@@ -48,16 +48,19 @@ const Dashboard = () => {
     }
   }, [user]);
 
-  const upcomingEvents = events
-    .filter((event) => new Date(event.startTime) > new Date())
+  const upcomingEvents = (events || [])
+    .filter(
+      (event) =>
+        event && event.startTime && new Date(event.startTime) > new Date(),
+    )
     .sort(
       (a, b) =>
         new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
     )
     .slice(0, 3);
 
-  const recentConversations = conversations.slice(0, 3);
-  const hangoutMatches = getHangoutMatches().slice(0, 2);
+  const recentConversations = (conversations || []).slice(0, 3);
+  const hangoutMatches = (getHangoutMatches() || []).slice(0, 2);
 
   const getInitials = (name: string) => {
     return name
