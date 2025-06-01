@@ -137,7 +137,8 @@ export const useCalendarStore = (userId?: string) => {
     const overlapStart = new Date(Math.max(start1.getTime(), start2.getTime()));
     const overlapEnd = new Date(Math.min(end1.getTime(), end2.getTime()));
 
-    if (overlapStart < overlapEnd) {
+    // Check if there's any overlap, even if it's just 1 minute or less
+    if (overlapStart <= overlapEnd) {
       return {
         start: overlapStart.toISOString(),
         end: overlapEnd.toISOString(),
@@ -199,6 +200,39 @@ export const useCalendarStore = (userId?: string) => {
     }));
   };
 
+  const getAllFriendHangouts = () => {
+    if (!userId) return [];
+
+    const currentUser = userStorage.getCurrentUser();
+    if (!currentUser) return [];
+
+    const allEvents = eventStorage.getEvents();
+    const friends = userStorage
+      .getUsers()
+      .filter((user) => currentUser.friends.includes(user.id));
+
+    const friendHangouts: Array<{ event: HangoutEvent; friend: User }> = [];
+
+    friends.forEach((friend) => {
+      const friendEvents = allEvents.filter(
+        (event) => event.userId === friend.id && event.type === "hangout",
+      ) as HangoutEvent[];
+
+      friendEvents.forEach((event) => {
+        friendHangouts.push({ event, friend });
+      });
+    });
+
+    // Sort by start time
+    friendHangouts.sort(
+      (a, b) =>
+        new Date(a.event.startTime).getTime() -
+        new Date(b.event.startTime).getTime(),
+    );
+
+    return friendHangouts;
+  };
+
   return {
     events,
     isLoading,
@@ -208,6 +242,7 @@ export const useCalendarStore = (userId?: string) => {
     getFriendEvents,
     getFriendHangouts,
     getHangoutMatches,
+    getAllFriendHangouts,
     loadEvents,
   };
 };
