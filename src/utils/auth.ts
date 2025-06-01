@@ -78,7 +78,7 @@ export const authenticateUser = (
   const user = users.find(
     (u) =>
       u.email === email.toLowerCase() &&
-      userStorage.storage.get(`password_${u.id}`) === hashedPassword,
+      storage.get(`password_${u.id}`) === hashedPassword,
   );
 
   return user || null;
@@ -117,7 +117,7 @@ export const registerUser = (
   const newUser = createUser(email, password, username, fullName);
 
   // Store password hash separately
-  userStorage.storage.set(`password_${newUser.id}`, hashPassword(password));
+  storage.set(`password_${newUser.id}`, hashPassword(password));
 
   // Add user to users list
   users.push(newUser);
