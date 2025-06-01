@@ -6,10 +6,6 @@ export const useNotificationStore = (userId?: string) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadNotifications();
-  }, [loadNotifications]);
-
   const loadNotifications = useCallback(() => {
     if (!userId) {
       setNotifications([]);
@@ -32,6 +28,10 @@ export const useNotificationStore = (userId?: string) => {
     setNotifications(userNotifications);
     setIsLoading(false);
   }, [userId]);
+
+  useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
 
   const markAsRead = (notificationId: string): void => {
     notificationStorage.markAsRead(notificationId);
