@@ -36,7 +36,7 @@ const Dashboard = () => {
   const { notifications, getUnreadCount } = useNotificationStore(user?.id);
 
   const [friendRequests, setFriendRequests] = useState<any[]>([]);
-  const friendHangouts = getAllFriendHangouts();
+  const friendHangouts = getAllFriendHangouts() || [];
 
   useEffect(() => {
     if (user) {
