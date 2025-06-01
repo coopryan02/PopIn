@@ -184,9 +184,11 @@ export const FriendHangouts = ({ friendHangouts }: FriendHangoutsProps) => {
 
         {upcomingHangouts.length > 5 && (
           <div className="text-center pt-2">
-            <Button variant="outline" size="sm">
-              View All {upcomingHangouts.length} Hangouts
-            </Button>
+            <Link to="/friend-hangouts">
+              <Button variant="outline" size="sm">
+                View All {upcomingHangouts.length} Hangouts
+              </Button>
+            </Link>
           </div>
         )}
       </CardContent>
