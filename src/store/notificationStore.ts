@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Notification } from "@/types";
 import { notificationStorage } from "@/utils/storage";
 
@@ -8,9 +8,9 @@ export const useNotificationStore = (userId?: string) => {
 
   useEffect(() => {
     loadNotifications();
-  }, [userId]);
+  }, [loadNotifications]);
 
-  const loadNotifications = () => {
+  const loadNotifications = useCallback(() => {
     if (!userId) {
       setNotifications([]);
       setIsLoading(false);
@@ -31,7 +31,7 @@ export const useNotificationStore = (userId?: string) => {
 
     setNotifications(userNotifications);
     setIsLoading(false);
-  };
+  }, [userId]);
 
   const markAsRead = (notificationId: string): void => {
     notificationStorage.markAsRead(notificationId);
