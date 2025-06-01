@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -27,7 +27,7 @@ import { useAuth } from "@/store/authStore";
 import { useNotificationStore } from "@/store/notificationStore";
 import { useMessageStore } from "@/store/messageStore";
 
-const navigation = [
+const navigationItems = [
   { name: "Home", href: "/dashboard", icon: Home },
   { name: "Calendar", href: "/calendar", icon: Calendar },
   { name: "Messages", href: "/messages", icon: MessageCircle },
@@ -41,8 +41,12 @@ export const Navbar = () => {
   const { getUnreadCount } = useNotificationStore(user?.id);
   const { getTotalUnreadCount } = useMessageStore(user?.id);
 
-  const unreadNotifications = getUnreadCount();
-  const unreadMessages = getTotalUnreadCount();
+  // Memoize counts to prevent unnecessary re-renders
+  const unreadNotifications = useMemo(() => getUnreadCount(), [getUnreadCount]);
+  const unreadMessages = useMemo(
+    () => getTotalUnreadCount(),
+    [getTotalUnreadCount],
+  );
 
   const handleLogout = () => {
     logout();
@@ -75,7 +79,7 @@ export const Navbar = () => {
 
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center space-x-6">
-          {navigation.map((item) => {
+          {navigationItems.map((item) => {
             const Icon = item.icon;
             const hasNotifications =
               (item.name === "Messages" && unreadMessages > 0) ||
@@ -181,7 +185,7 @@ export const Navbar = () => {
             </SheetTrigger>
             <SheetContent side="right" className="w-80">
               <div className="flex flex-col space-y-4 mt-6">
-                {navigation.map((item) => {
+                {navigationItems.map((item) => {
                   const Icon = item.icon;
                   const hasNotifications =
                     (item.name === "Messages" && unreadMessages > 0) ||
