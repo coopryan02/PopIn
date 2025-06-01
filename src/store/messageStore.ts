@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Message, Conversation, User, Notification } from "@/types";
 import {
   conversationStorage,
@@ -10,10 +10,6 @@ import { generateId } from "@/utils/auth";
 export const useMessageStore = (userId?: string) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    loadConversations();
-  }, [loadConversations]);
 
   const loadConversations = useCallback(() => {
     if (!userId) {
@@ -37,6 +33,10 @@ export const useMessageStore = (userId?: string) => {
     setConversations(userConversations);
     setIsLoading(false);
   }, [userId]);
+
+  useEffect(() => {
+    loadConversations();
+  }, [loadConversations]);
 
   const sendMessage = (receiverId: string, content: string): Message => {
     if (!userId) throw new Error("User ID is required");
