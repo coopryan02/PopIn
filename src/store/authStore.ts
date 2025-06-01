@@ -1,25 +1,11 @@
-import {
-  useState,
-  useEffect,
-  createContext,
-  useContext,
-  ReactNode,
-} from "react";
-import { AuthState, User } from "@/types";
-import { userStorage } from "@/utils/storage";
-import { authenticateUser, registerUser } from "@/utils/auth";
+import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { AuthState, User } from '@/types';
+import { userStorage } from '@/utils/storage';
+import { authenticateUser, registerUser } from '@/utils/auth';
 
 interface AuthContextType extends AuthState {
-  login: (
-    email: string,
-    password: string,
-  ) => Promise<{ success: boolean; error?: string }>;
-  register: (
-    email: string,
-    password: string,
-    username: string,
-    fullName: string,
-  ) => Promise<{ success: boolean; error?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  register: (email: string, password: string, username: string, fullName: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   updateUser: (user: User) => void;
 }
@@ -29,12 +15,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };
 
-export const useAuthStore = () => {
+const useAuthStore = () => {
   const [state, setState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
@@ -51,15 +37,12 @@ export const useAuthStore = () => {
     });
   }, []);
 
-  const login = async (
-    email: string,
-    password: string,
-  ): Promise<{ success: boolean; error?: string }> => {
-    setState((prev) => ({ ...prev, isLoading: true }));
-
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    setState(prev => ({ ...prev, isLoading: true }));
+    
     try {
       const user = authenticateUser(email, password);
-
+      
       if (user) {
         userStorage.setCurrentUser(user);
         setState({
@@ -69,26 +52,26 @@ export const useAuthStore = () => {
         });
         return { success: true };
       } else {
-        setState((prev) => ({ ...prev, isLoading: false }));
-        return { success: false, error: "Invalid email or password" };
+        setState(prev => ({ ...prev, isLoading: false }));
+        return { success: false, error: 'Invalid email or password' };
       }
     } catch (error) {
-      setState((prev) => ({ ...prev, isLoading: false }));
-      return { success: false, error: "Login failed. Please try again." };
+      setState(prev => ({ ...prev, isLoading: false }));
+      return { success: false, error: 'Login failed. Please try again.' };
     }
   };
 
   const register = async (
-    email: string,
-    password: string,
-    username: string,
-    fullName: string,
+    email: string, 
+    password: string, 
+    username: string, 
+    fullName: string
   ): Promise<{ success: boolean; error?: string }> => {
-    setState((prev) => ({ ...prev, isLoading: true }));
-
+    setState(prev => ({ ...prev, isLoading: true }));
+    
     try {
       const result = registerUser(email, password, username, fullName);
-
+      
       if (result.success && result.user) {
         userStorage.setCurrentUser(result.user);
         setState({
@@ -98,15 +81,12 @@ export const useAuthStore = () => {
         });
         return { success: true };
       } else {
-        setState((prev) => ({ ...prev, isLoading: false }));
+        setState(prev => ({ ...prev, isLoading: false }));
         return { success: false, error: result.error };
       }
     } catch (error) {
-      setState((prev) => ({ ...prev, isLoading: false }));
-      return {
-        success: false,
-        error: "Registration failed. Please try again.",
-      };
+      setState(prev => ({ ...prev, isLoading: false }));
+      return { success: false, error: 'Registration failed. Please try again.' };
     }
   };
 
@@ -122,7 +102,7 @@ export const useAuthStore = () => {
   const updateUser = (user: User) => {
     userStorage.updateUser(user);
     userStorage.setCurrentUser(user);
-    setState((prev) => ({ ...prev, user }));
+    setState(prev => ({ ...prev, user }));
   };
 
   return {
@@ -132,4 +112,18 @@ export const useAuthStore = () => {
     logout,
     updateUser,
   };
+};
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider = ({ children }: AuthProviderProps) => {
+  const auth = useAuthStore();
+
+  return (
+    <AuthContext.Provider value={auth}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
