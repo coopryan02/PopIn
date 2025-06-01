@@ -119,7 +119,19 @@ export const useCalendarStore = (userId?: string) => {
       friendHangouts.forEach((friendHangout) => {
         const overlap = getTimeOverlap(hangoutEvent, friendHangout);
         if (overlap) {
-          createHangoutMatch(hangoutEvent, friendHangout, overlap);
+          // Check if notification already exists to avoid duplicates
+          const existingNotifications = notificationStorage.getNotifications();
+          const alreadyNotified = existingNotifications.some(
+            (notification) =>
+              notification.userId === userId &&
+              notification.type === "hangout_match" &&
+              notification.data?.hangoutEvents?.includes(hangoutEvent.id) &&
+              notification.data?.hangoutEvents?.includes(friendHangout.id),
+          );
+
+          if (!alreadyNotified) {
+            createHangoutMatch(hangoutEvent, friendHangout, overlap);
+          }
         }
       });
     });
