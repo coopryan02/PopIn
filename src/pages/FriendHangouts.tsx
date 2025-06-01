@@ -7,7 +7,7 @@ const FriendHangoutsPage = () => {
   const { user } = useAuth();
   const { getAllFriendHangouts } = useCalendarStore(user?.id);
 
-  const friendHangouts = getAllFriendHangouts();
+  const friendHangouts = getAllFriendHangouts() || [];
 
   return (
     <Layout>
