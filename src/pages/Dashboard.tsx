@@ -29,11 +29,14 @@ import { format } from "date-fns";
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const { events, getHangoutMatches } = useCalendarStore(user?.id);
+  const { events, getHangoutMatches, getAllFriendHangouts } = useCalendarStore(
+    user?.id,
+  );
   const { conversations, getTotalUnreadCount } = useMessageStore(user?.id);
   const { notifications, getUnreadCount } = useNotificationStore(user?.id);
 
   const [friendRequests, setFriendRequests] = useState<any[]>([]);
+  const friendHangouts = getAllFriendHangouts();
 
   useEffect(() => {
     if (user) {
@@ -142,13 +145,19 @@ const Dashboard = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                Hangout Matches
+                Friends' Hangouts
               </CardTitle>
               <MapPin className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{hangoutMatches.length}</div>
-              <p className="text-xs text-muted-foreground">Available now</p>
+              <div className="text-2xl font-bold">
+                {
+                  friendHangouts.filter(
+                    ({ event }) => new Date(event.startTime) > new Date(),
+                  ).length
+                }
+              </div>
+              <p className="text-xs text-muted-foreground">Upcoming plans</p>
             </CardContent>
           </Card>
         </div>
@@ -274,6 +283,9 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Friends' Hangouts - Always visible */}
+        <FriendHangouts friendHangouts={friendHangouts} />
 
         {/* Friend Requests & Hangout Matches */}
         {(friendRequests.length > 0 || hangoutMatches.length > 0) && (
