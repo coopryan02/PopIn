@@ -36,7 +36,10 @@ export const NotificationBell = () => {
   );
   const [isOpen, setIsOpen] = useState(false);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadCount = useMemo(
+    () => notifications.filter((n) => !n.read).length,
+    [notifications],
+  );
 
   const getInitials = (name: string) => {
     return name
