@@ -154,11 +154,10 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {
-                  friendHangouts.filter(
-                    ({ event }) => new Date(event.startTime) > new Date(),
-                  ).length
-                }
+                {friendHangouts?.filter?.(
+                  ({ event }) =>
+                    event?.startTime && new Date(event.startTime) > new Date(),
+                )?.length || 0}
               </div>
               <p className="text-xs text-muted-foreground">Upcoming plans</p>
             </CardContent>
