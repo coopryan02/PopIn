@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { HangoutOverlapModal } from "./HangoutOverlapModal";
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -16,8 +17,9 @@ import {
   MapPin,
   Plus,
   Clock,
+  Users,
 } from "lucide-react";
-import { Event, HangoutEvent } from "@/types";
+import { Event, HangoutEvent, User } from "@/types";
 import {
   format,
   startOfMonth,
@@ -34,6 +36,18 @@ interface CalendarViewProps {
   events: Event[];
   onDateSelect: (date: Date) => void;
   onEventClick: (event: Event) => void;
+  getOverlappingHangouts?: (date: Date) => Array<{
+    userEvent: HangoutEvent;
+    friendEvent: HangoutEvent;
+    friend: User;
+    overlap: { start: string; end: string };
+  }>;
+  checkEventOverlap?: (eventId: string) => {
+    userEvent: HangoutEvent;
+    friendEvent: HangoutEvent;
+    friend: User;
+    overlap: { start: string; end: string };
+  } | null;
   selectedDate?: Date;
 }
 
@@ -41,9 +55,18 @@ export const CalendarView = ({
   events,
   onDateSelect,
   onEventClick,
+  getOverlappingHangouts,
+  checkEventOverlap,
   selectedDate,
 }: CalendarViewProps) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [showOverlapModal, setShowOverlapModal] = useState(false);
+  const [selectedOverlap, setSelectedOverlap] = useState<{
+    userEvent: HangoutEvent;
+    friendEvent: HangoutEvent;
+    friend: User;
+    overlap: { start: string; end: string };
+  } | null>(null);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -220,67 +243,103 @@ export const CalendarView = ({
                     No events scheduled for this date
                   </p>
                 ) : (
-                  getSelectedDateEvents().map((event) => (
-                    <div
-                      key={event.id}
-                      onClick={() => onEventClick(event)}
-                      className="p-3 border rounded-lg cursor-pointer hover:bg-muted transition-colors"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2 mb-1">
-                            <h4 className="font-medium">{event.title}</h4>
-                            {event.type === "hangout" && (
-                              <Badge variant="secondary" className="text-xs">
-                                <MapPin className="h-3 w-3 mr-1" />
-                                Hangout
-                              </Badge>
+                  getSelectedDateEvents().map((event) => {
+                    const hasOverlap =
+                      event.type === "hangout" &&
+                      checkEventOverlap &&
+                      checkEventOverlap(event.id);
+
+                    return (
+                      <div
+                        key={event.id}
+                        onClick={() => {
+                          if (hasOverlap && event.type === "hangout") {
+                            setSelectedOverlap(hasOverlap);
+                            setShowOverlapModal(true);
+                          } else {
+                            onEventClick(event);
+                          }
+                        }}
+                        className={cn(
+                          "p-3 border rounded-lg cursor-pointer transition-colors",
+                          hasOverlap
+                            ? "bg-gradient-to-r from-green-50 to-blue-50 border-green-200 hover:from-green-100 hover:to-blue-100"
+                            : "hover:bg-muted",
+                        )}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2 mb-1">
+                              <h4 className="font-medium">{event.title}</h4>
+                              {event.type === "hangout" && (
+                                <Badge variant="secondary" className="text-xs">
+                                  <MapPin className="h-3 w-3 mr-1" />
+                                  Hangout
+                                </Badge>
+                              )}
+                              {hasOverlap && (
+                                <Badge
+                                  variant="default"
+                                  className="text-xs bg-green-600"
+                                >
+                                  <Users className="h-3 w-3 mr-1" />
+                                  Match!
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center space-x-1 text-sm text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              <span>
+                                {format(new Date(event.startTime), "h:mm a")} -{" "}
+                                {format(new Date(event.endTime), "h:mm a")}
+                              </span>
+                            </div>
+                            {event.description && (
+                              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                {event.description}
+                              </p>
                             )}
-                          </div>
-                          <div className="flex items-center space-x-1 text-sm text-muted-foreground">
-                            <Clock className="h-3 w-3" />
-                            <span>
-                              {format(new Date(event.startTime), "h:mm a")} -{" "}
-                              {format(new Date(event.endTime), "h:mm a")}
-                            </span>
-                          </div>
-                          {event.description && (
-                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                              {event.description}
-                            </p>
-                          )}
-                          {event.type === "hangout" &&
-                            (event as HangoutEvent).preferences
-                              ?.activitySuggestions && (
-                              <div className="flex flex-wrap gap-1 mt-2">
-                                {(
-                                  event as HangoutEvent
-                                ).preferences.activitySuggestions
-                                  .slice(0, 3)
-                                  .map((activity, index) => (
+                            {event.type === "hangout" &&
+                              (event as HangoutEvent).preferences
+                                ?.activitySuggestions && (
+                                <div className="flex flex-wrap gap-1 mt-2">
+                                  {(
+                                    event as HangoutEvent
+                                  ).preferences.activitySuggestions
+                                    .slice(0, 3)
+                                    .map((activity, index) => (
+                                      <Badge
+                                        key={index}
+                                        variant="outline"
+                                        className="text-xs"
+                                      >
+                                        {activity}
+                                      </Badge>
+                                    ))}
+                                  {(event as HangoutEvent).preferences
+                                    .activitySuggestions.length > 3 && (
                                     <Badge
-                                      key={index}
                                       variant="outline"
                                       className="text-xs"
                                     >
-                                      {activity}
+                                      +
+                                      {(event as HangoutEvent).preferences
+                                        .activitySuggestions.length - 3}{" "}
+                                      more
                                     </Badge>
-                                  ))}
-                                {(event as HangoutEvent).preferences
-                                  .activitySuggestions.length > 3 && (
-                                  <Badge variant="outline" className="text-xs">
-                                    +
-                                    {(event as HangoutEvent).preferences
-                                      .activitySuggestions.length - 3}{" "}
-                                    more
-                                  </Badge>
-                                )}
-                              </div>
+                                  )}
+                                </div>
+                              )}
+                            {hasOverlap && (
+                              <p className="text-sm text-green-600 font-medium mt-2">
+                                🎉 Click to see friend overlap details!
+                              </p>
                             )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             ) : (
@@ -304,6 +363,10 @@ export const CalendarView = ({
             <div className="flex items-center space-x-2">
               <div className="w-4 h-4 bg-blue-100 border border-blue-200 rounded"></div>
               <span className="text-sm">Hangouts</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-4 bg-gradient-to-r from-green-100 to-blue-100 border-2 border-green-300 rounded"></div>
+              <span className="text-sm">Overlapping Hangouts!</span>
             </div>
           </CardContent>
         </Card>
