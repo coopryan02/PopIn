@@ -35,21 +35,39 @@ interface LoginFormProps {
 export const LoginForm = ({ onSubmit, isLoading = false }: LoginFormProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
   });
 
-  const handleLogin = async (data: LoginFormData) => {
-    setError(null);
-    const result = await onSubmit(data.email, data.password);
+  const handleLogin = async (data: LoginFormData, event?: React.FormEvent) => {
+    // Prevent default form submission
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
 
-    if (!result.success) {
-      setError(result.error || "Login failed");
+    console.log("Form submission started:", data);
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      const result = await onSubmit(data.email, data.password);
+      console.log("Login result:", result);
+
+      if (!result.success) {
+        setError(result.error || "Login failed");
+      }
+    } catch (error: any) {
+      console.error("Login form error:", error);
+      setError(error.message || "An unexpected error occurred");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -64,7 +82,13 @@ export const LoginForm = ({ onSubmit, isLoading = false }: LoginFormProps) => {
         </CardDescription>
       </CardHeader>
 
-      <form onSubmit={handleSubmit(handleLogin)}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleSubmit((data) => handleLogin(data, e))(e);
+        }}
+      >
         <CardContent className="space-y-4">
           {error && (
             <Alert variant="destructive">
@@ -80,6 +104,7 @@ export const LoginForm = ({ onSubmit, isLoading = false }: LoginFormProps) => {
               placeholder="Enter your email"
               {...register("email")}
               className={errors.email ? "border-red-500" : ""}
+              disabled={isSubmitting || isLoading}
             />
             {errors.email && (
               <p className="text-sm text-red-500">{errors.email.message}</p>
@@ -95,6 +120,7 @@ export const LoginForm = ({ onSubmit, isLoading = false }: LoginFormProps) => {
                 placeholder="Enter your password"
                 {...register("password")}
                 className={errors.password ? "border-red-500" : ""}
+                disabled={isSubmitting || isLoading}
               />
               <Button
                 type="button"
@@ -102,6 +128,7 @@ export const LoginForm = ({ onSubmit, isLoading = false }: LoginFormProps) => {
                 size="sm"
                 className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                 onClick={() => setShowPassword(!showPassword)}
+                disabled={isSubmitting || isLoading}
               >
                 {showPassword ? (
                   <EyeOff className="h-4 w-4" />

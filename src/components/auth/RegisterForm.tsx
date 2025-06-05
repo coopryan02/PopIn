@@ -31,7 +31,7 @@ const registerSchema = z
     email: z.string().email("Please enter a valid email address"),
     password: z
       .string()
-      .min(8, "Password must be at least 8 characters")
+      .min(6, "Password must be at least 6 characters")
       .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
       .regex(/[a-z]/, "Password must contain at least one lowercase letter")
       .regex(/\d/, "Password must contain at least one number"),
@@ -61,26 +61,47 @@ export const RegisterForm = ({
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
   });
 
-  const handleRegister = async (data: RegisterFormData) => {
-    setError(null);
-    const result = await onSubmit(
-      data.email,
-      data.password,
-      data.username,
-      data.fullName,
-    );
+  const handleRegister = async (
+    data: RegisterFormData,
+    event?: React.FormEvent,
+  ) => {
+    // Prevent default form submission
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
 
-    if (!result.success) {
-      setError(result.error || "Registration failed");
+    console.log("Register form submission started:", data);
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      const result = await onSubmit(
+        data.email,
+        data.password,
+        data.username,
+        data.fullName,
+      );
+      console.log("Register result:", result);
+
+      if (!result.success) {
+        setError(result.error || "Registration failed");
+      }
+    } catch (error: any) {
+      console.error("Register form error:", error);
+      setError(error.message || "An unexpected error occurred");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -95,7 +116,13 @@ export const RegisterForm = ({
         </CardDescription>
       </CardHeader>
 
-      <form onSubmit={handleSubmit(handleRegister)}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleSubmit((data) => handleRegister(data, e))(e);
+        }}
+      >
         <CardContent className="space-y-4">
           {error && (
             <Alert variant="destructive">
@@ -111,6 +138,7 @@ export const RegisterForm = ({
               placeholder="Enter your full name"
               {...register("fullName")}
               className={errors.fullName ? "border-red-500" : ""}
+              disabled={isSubmitting || isLoading}
             />
             {errors.fullName && (
               <p className="text-sm text-red-500">{errors.fullName.message}</p>
@@ -125,6 +153,7 @@ export const RegisterForm = ({
               placeholder="Choose a username"
               {...register("username")}
               className={errors.username ? "border-red-500" : ""}
+              disabled={isSubmitting || isLoading}
             />
             {errors.username && (
               <p className="text-sm text-red-500">{errors.username.message}</p>
@@ -139,6 +168,7 @@ export const RegisterForm = ({
               placeholder="Enter your email"
               {...register("email")}
               className={errors.email ? "border-red-500" : ""}
+              disabled={isSubmitting || isLoading}
             />
             {errors.email && (
               <p className="text-sm text-red-500">{errors.email.message}</p>
@@ -154,6 +184,7 @@ export const RegisterForm = ({
                 placeholder="Create a password"
                 {...register("password")}
                 className={errors.password ? "border-red-500" : ""}
+                disabled={isSubmitting || isLoading}
               />
               <Button
                 type="button"
@@ -161,6 +192,7 @@ export const RegisterForm = ({
                 size="sm"
                 className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                 onClick={() => setShowPassword(!showPassword)}
+                disabled={isSubmitting || isLoading}
               >
                 {showPassword ? (
                   <EyeOff className="h-4 w-4" />
@@ -183,6 +215,7 @@ export const RegisterForm = ({
                 placeholder="Confirm your password"
                 {...register("confirmPassword")}
                 className={errors.confirmPassword ? "border-red-500" : ""}
+                disabled={isSubmitting || isLoading}
               />
               <Button
                 type="button"
@@ -190,6 +223,7 @@ export const RegisterForm = ({
                 size="sm"
                 className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                disabled={isSubmitting || isLoading}
               >
                 {showConfirmPassword ? (
                   <EyeOff className="h-4 w-4" />

@@ -2,7 +2,6 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
-  User as FirebaseUser,
   onAuthStateChanged,
   updateProfile,
 } from "firebase/auth";
@@ -23,36 +22,11 @@ import {
   onSnapshot,
   arrayUnion,
   arrayRemove,
-  Timestamp,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
-import { User, Event, Message, Conversation, Notification } from "@/types";
+import { User, Event, Message, Notification } from "@/types";
 
-// Simulated backend storage for demo purposes
-const STORAGE_PREFIX = "social_network_";
-
-// Helper functions for local storage simulation
-const getFromStorage = (key: string) => {
-  try {
-    const data = localStorage.getItem(STORAGE_PREFIX + key);
-    return data ? JSON.parse(data) : null;
-  } catch {
-    return null;
-  }
-};
-
-const saveToStorage = (key: string, data: any) => {
-  try {
-    localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(data));
-  } catch (error) {
-    console.error("Storage error:", error);
-  }
-};
-
-// Generate unique IDs
-const generateId = () => Math.random().toString(36).substr(2, 9);
-
-// User Management - Using local storage simulation for demo
+// User Management with Real Firebase
 export const createUserAccount = async (
   email: string,
   password: string,
@@ -60,29 +34,39 @@ export const createUserAccount = async (
   fullName: string,
 ): Promise<{ success: boolean; error?: string; user?: User }> => {
   try {
-    // Simulate checking if username exists
-    const existingUsers = getFromStorage("users") || {};
-    const userExists = Object.values(existingUsers).some(
-      (user: any) => user.username.toLowerCase() === username.toLowerCase(),
-    );
+    console.log("Creating user account...", { email, username, fullName });
 
-    if (userExists) {
+    // Check if username is already taken
+    const usernameQuery = query(
+      collection(db, "users"),
+      where("username", "==", username.toLowerCase()),
+    );
+    const usernameSnapshot = await getDocs(usernameQuery);
+
+    if (!usernameSnapshot.empty) {
+      console.log("Username already exists");
       return { success: false, error: "Username already exists" };
     }
 
-    // Check email exists
-    const emailExists = Object.values(existingUsers).some(
-      (user: any) => user.email.toLowerCase() === email.toLowerCase(),
+    // Create Firebase user
+    console.log("Creating Firebase auth user...");
+    const userCredential = await createUserWithEmailAndPassword(
+      auth,
+      email,
+      password,
     );
+    const firebaseUser = userCredential.user;
 
-    if (emailExists) {
-      return { success: false, error: "Email already exists" };
-    }
+    console.log("Firebase user created:", firebaseUser.uid);
 
-    // Create user
-    const userId = generateId();
+    // Update Firebase profile
+    await updateProfile(firebaseUser, {
+      displayName: fullName,
+    });
+
+    // Create user document in Firestore
     const userData: User = {
-      id: userId,
+      id: firebaseUser.uid,
       email: email.toLowerCase(),
       username: username.toLowerCase(),
       fullName,
@@ -94,23 +78,28 @@ export const createUserAccount = async (
       createdAt: new Date().toISOString(),
     };
 
-    // Save user
-    const users = getFromStorage("users") || {};
-    users[userId] = userData;
-    saveToStorage("users", users);
+    console.log("Saving user data to Firestore...", userData);
+    await setDoc(doc(db, "users", firebaseUser.uid), userData);
 
-    // Save auth info
-    const authData = getFromStorage("auth") || {};
-    authData[email.toLowerCase()] = { password, userId };
-    saveToStorage("auth", authData);
-
-    console.log("User account created successfully:", userData);
+    console.log("User account created successfully!");
     return { success: true, user: userData };
   } catch (error: any) {
     console.error("Error creating user:", error);
+    let errorMessage = "Failed to create account";
+
+    if (error.code === "auth/email-already-in-use") {
+      errorMessage = "This email is already registered";
+    } else if (error.code === "auth/weak-password") {
+      errorMessage = "Password should be at least 6 characters";
+    } else if (error.code === "auth/invalid-email") {
+      errorMessage = "Invalid email address";
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+
     return {
       success: false,
-      error: error.message || "Failed to create account",
+      error: errorMessage,
     };
   }
 };
@@ -120,33 +109,55 @@ export const signInUser = async (
   password: string,
 ): Promise<{ success: boolean; error?: string; user?: User }> => {
   try {
-    const authData = getFromStorage("auth") || {};
-    const userAuth = authData[email.toLowerCase()];
+    console.log("Signing in user...", email);
 
-    if (!userAuth || userAuth.password !== password) {
-      return { success: false, error: "Invalid email or password" };
-    }
+    const userCredential = await signInWithEmailAndPassword(
+      auth,
+      email,
+      password,
+    );
+    const firebaseUser = userCredential.user;
 
-    const users = getFromStorage("users") || {};
-    const userData = users[userAuth.userId];
+    console.log("Firebase auth successful:", firebaseUser.uid);
 
-    if (!userData) {
+    // Get user data from Firestore
+    const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+
+    if (!userDoc.exists()) {
+      console.error("User data not found in Firestore");
       return { success: false, error: "User data not found" };
     }
 
+    const userData = userDoc.data() as User;
     console.log("User signed in successfully:", userData);
     return { success: true, user: userData };
   } catch (error: any) {
     console.error("Error signing in:", error);
+    let errorMessage = "Failed to sign in";
+
+    if (error.code === "auth/user-not-found") {
+      errorMessage = "No account found with this email";
+    } else if (error.code === "auth/wrong-password") {
+      errorMessage = "Incorrect password";
+    } else if (error.code === "auth/invalid-email") {
+      errorMessage = "Invalid email address";
+    } else if (error.code === "auth/too-many-requests") {
+      errorMessage = "Too many failed attempts. Please try again later";
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+
     return {
       success: false,
-      error: error.message || "Failed to sign in",
+      error: errorMessage,
     };
   }
 };
 
 export const signOutUser = async (): Promise<void> => {
   try {
+    console.log("Signing out user...");
+    await signOut(auth);
     console.log("User signed out successfully");
   } catch (error) {
     console.error("Error signing out:", error);
@@ -154,30 +165,34 @@ export const signOutUser = async (): Promise<void> => {
 };
 
 export const getCurrentUser = async (): Promise<User | null> => {
-  // In a real app, this would get the current Firebase user
-  // For demo, we'll return null since we're using local storage
-  return null;
-};
-
-// Auth state listener - simulate with event
-let authStateCallback: ((user: User | null) => void) | null = null;
-
-export const onAuthStateChange = (callback: (user: User | null) => void) => {
-  authStateCallback = callback;
-  // Immediately call with null for demo
-  callback(null);
-
-  // Return unsubscribe function
-  return () => {
-    authStateCallback = null;
-  };
-};
-
-// Simulate auth state change
-export const simulateAuthStateChange = (user: User | null) => {
-  if (authStateCallback) {
-    authStateCallback(user);
+  const firebaseUser = auth.currentUser;
+  if (!firebaseUser) {
+    console.log("No current Firebase user");
+    return null;
   }
+
+  try {
+    console.log("Getting current user data:", firebaseUser.uid);
+    const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+    return userDoc.exists() ? (userDoc.data() as User) : null;
+  } catch (error) {
+    console.error("Error getting current user:", error);
+    return null;
+  }
+};
+
+// Auth state listener
+export const onAuthStateChange = (callback: (user: User | null) => void) => {
+  console.log("Setting up auth state listener...");
+  return onAuthStateChanged(auth, async (firebaseUser) => {
+    console.log("Auth state changed:", firebaseUser?.uid || "null");
+    if (firebaseUser) {
+      const userData = await getCurrentUser();
+      callback(userData);
+    } else {
+      callback(null);
+    }
+  });
 };
 
 // User Search and Friends
@@ -186,21 +201,23 @@ export const searchUsers = async (
   currentUserId: string,
 ): Promise<User[]> => {
   try {
-    const users = getFromStorage("users") || {};
-    const results: User[] = [];
+    const usersQuery = collection(db, "users");
+    const snapshot = await getDocs(usersQuery);
 
-    Object.values(users).forEach((userData: any) => {
+    const users: User[] = [];
+    snapshot.forEach((doc) => {
+      const userData = doc.data() as User;
       if (
         userData.id !== currentUserId &&
         (userData.username.toLowerCase().includes(query.toLowerCase()) ||
           userData.fullName.toLowerCase().includes(query.toLowerCase()) ||
           userData.email.toLowerCase().includes(query.toLowerCase()))
       ) {
-        results.push(userData);
+        users.push(userData);
       }
     });
 
-    return results;
+    return users;
   } catch (error) {
     console.error("Error searching users:", error);
     return [];
@@ -212,34 +229,28 @@ export const sendFriendRequest = async (
   toUserId: string,
 ): Promise<boolean> => {
   try {
-    const users = getFromStorage("users") || {};
-
     // Update sender's sent requests
-    if (users[fromUserId]) {
-      users[fromUserId].friendRequests.sent.push(toUserId);
-    }
+    const fromUserRef = doc(db, "users", fromUserId);
+    await updateDoc(fromUserRef, {
+      "friendRequests.sent": arrayUnion(toUserId),
+    });
 
     // Update receiver's received requests
-    if (users[toUserId]) {
-      users[toUserId].friendRequests.received.push(fromUserId);
-    }
-
-    saveToStorage("users", users);
+    const toUserRef = doc(db, "users", toUserId);
+    await updateDoc(toUserRef, {
+      "friendRequests.received": arrayUnion(fromUserId),
+    });
 
     // Create notification
-    const notifications = getFromStorage("notifications") || {};
-    const notificationId = generateId();
-    notifications[notificationId] = {
-      id: notificationId,
+    await addDoc(collection(db, "notifications"), {
       userId: toUserId,
       type: "friend_request",
       title: "New Friend Request",
       message: "Someone sent you a friend request",
       data: { senderId: fromUserId },
       read: false,
-      createdAt: new Date().toISOString(),
-    };
-    saveToStorage("notifications", notifications);
+      createdAt: serverTimestamp(),
+    });
 
     return true;
   } catch (error) {
@@ -253,24 +264,20 @@ export const acceptFriendRequest = async (
   requesterId: string,
 ): Promise<boolean> => {
   try {
-    const users = getFromStorage("users") || {};
-
     // Update both users' friend lists
-    if (users[userId]) {
-      users[userId].friendRequests.received = users[
-        userId
-      ].friendRequests.received.filter((id: string) => id !== requesterId);
-      users[userId].friends.push(requesterId);
-    }
+    const userRef = doc(db, "users", userId);
+    const requesterRef = doc(db, "users", requesterId);
 
-    if (users[requesterId]) {
-      users[requesterId].friendRequests.sent = users[
-        requesterId
-      ].friendRequests.sent.filter((id: string) => id !== userId);
-      users[requesterId].friends.push(userId);
-    }
+    await updateDoc(userRef, {
+      "friendRequests.received": arrayRemove(requesterId),
+      friends: arrayUnion(requesterId),
+    });
 
-    saveToStorage("users", users);
+    await updateDoc(requesterRef, {
+      "friendRequests.sent": arrayRemove(userId),
+      friends: arrayUnion(userId),
+    });
+
     return true;
   } catch (error) {
     console.error("Error accepting friend request:", error);
@@ -283,21 +290,17 @@ export const rejectFriendRequest = async (
   requesterId: string,
 ): Promise<boolean> => {
   try {
-    const users = getFromStorage("users") || {};
+    const userRef = doc(db, "users", userId);
+    const requesterRef = doc(db, "users", requesterId);
 
-    if (users[userId]) {
-      users[userId].friendRequests.received = users[
-        userId
-      ].friendRequests.received.filter((id: string) => id !== requesterId);
-    }
+    await updateDoc(userRef, {
+      "friendRequests.received": arrayRemove(requesterId),
+    });
 
-    if (users[requesterId]) {
-      users[requesterId].friendRequests.sent = users[
-        requesterId
-      ].friendRequests.sent.filter((id: string) => id !== userId);
-    }
+    await updateDoc(requesterRef, {
+      "friendRequests.sent": arrayRemove(userId),
+    });
 
-    saveToStorage("users", users);
     return true;
   } catch (error) {
     console.error("Error rejecting friend request:", error);
@@ -310,23 +313,17 @@ export const createEvent = async (
   event: Omit<Event, "id">,
 ): Promise<string | null> => {
   try {
-    const eventId = generateId();
-    const events = getFromStorage("events") || {};
-
-    events[eventId] = {
+    const docRef = await addDoc(collection(db, "events"), {
       ...event,
-      id: eventId,
-      createdAt: new Date().toISOString(),
-    };
-
-    saveToStorage("events", events);
+      createdAt: serverTimestamp(),
+    });
 
     // If it's a hangout, check for overlaps
     if (event.type === "hangout") {
-      await checkForHangoutOverlaps(eventId, event);
+      await checkForHangoutOverlaps(docRef.id, event);
     }
 
-    return eventId;
+    return docRef.id;
   } catch (error) {
     console.error("Error creating event:", error);
     return null;
@@ -335,19 +332,20 @@ export const createEvent = async (
 
 export const getUserEvents = async (userId: string): Promise<Event[]> => {
   try {
-    const events = getFromStorage("events") || {};
-    const userEvents: Event[] = [];
+    const eventsQuery = query(
+      collection(db, "events"),
+      where("userId", "==", userId),
+      orderBy("startTime", "asc"),
+    );
 
-    Object.values(events).forEach((event: any) => {
-      if (event.userId === userId) {
-        userEvents.push(event);
-      }
+    const snapshot = await getDocs(eventsQuery);
+    const events: Event[] = [];
+
+    snapshot.forEach((doc) => {
+      events.push({ id: doc.id, ...doc.data() } as Event);
     });
 
-    return userEvents.sort(
-      (a, b) =>
-        new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
-    );
+    return events;
   } catch (error) {
     console.error("Error getting user events:", error);
     return [];
@@ -359,11 +357,7 @@ export const updateEvent = async (
   updates: Partial<Event>,
 ): Promise<boolean> => {
   try {
-    const events = getFromStorage("events") || {};
-    if (events[eventId]) {
-      events[eventId] = { ...events[eventId], ...updates };
-      saveToStorage("events", events);
-    }
+    await updateDoc(doc(db, "events", eventId), updates);
     return true;
   } catch (error) {
     console.error("Error updating event:", error);
@@ -373,9 +367,7 @@ export const updateEvent = async (
 
 export const deleteEvent = async (eventId: string): Promise<boolean> => {
   try {
-    const events = getFromStorage("events") || {};
-    delete events[eventId];
-    saveToStorage("events", events);
+    await deleteDoc(doc(db, "events", eventId));
     return true;
   } catch (error) {
     console.error("Error deleting event:", error);
@@ -389,77 +381,77 @@ const checkForHangoutOverlaps = async (
   event: Omit<Event, "id">,
 ) => {
   try {
-    const users = getFromStorage("users") || {};
-    const events = getFromStorage("events") || {};
-    const notifications = getFromStorage("notifications") || {};
+    // Get user's friends
+    const userDoc = await getDoc(doc(db, "users", event.userId));
+    if (!userDoc.exists()) return;
 
-    const userData = users[event.userId];
-    if (!userData) return;
-
+    const userData = userDoc.data() as User;
     const friends = userData.friends;
 
     // Get all friend hangouts
     for (const friendId of friends) {
-      Object.values(events).forEach((friendEvent: any) => {
-        if (friendEvent.userId === friendId && friendEvent.type === "hangout") {
-          // Check for time overlap
-          const eventStart = new Date(event.startTime);
-          const eventEnd = new Date(event.endTime);
-          const friendStart = new Date(friendEvent.startTime);
-          const friendEnd = new Date(friendEvent.endTime);
+      const friendEventsQuery = query(
+        collection(db, "events"),
+        where("userId", "==", friendId),
+        where("type", "==", "hangout"),
+      );
 
-          const overlapStart = new Date(
-            Math.max(eventStart.getTime(), friendStart.getTime()),
-          );
-          const overlapEnd = new Date(
-            Math.min(eventEnd.getTime(), friendEnd.getTime()),
-          );
+      const friendEventsSnapshot = await getDocs(friendEventsQuery);
 
-          if (overlapStart <= overlapEnd) {
-            // Create hangout match notifications
-            const overlap = {
-              start: overlapStart.toISOString(),
-              end: overlapEnd.toISOString(),
-            };
+      friendEventsSnapshot.forEach(async (friendEventDoc) => {
+        const friendEvent = friendEventDoc.data() as Event;
 
-            // Notify both users
-            const notification1Id = generateId();
-            notifications[notification1Id] = {
-              id: notification1Id,
-              userId: event.userId,
-              type: "hangout_match",
-              title: "Hangout Match Found!",
-              message: "You have an overlapping hangout time with a friend",
-              data: {
-                matchedUserId: friendId,
-                overlappingTime: overlap,
-                hangoutEvents: [eventId, friendEvent.id],
-              },
-              read: false,
-              createdAt: new Date().toISOString(),
-            };
+        // Check for time overlap
+        const eventStart = new Date(event.startTime);
+        const eventEnd = new Date(event.endTime);
+        const friendStart = new Date(friendEvent.startTime);
+        const friendEnd = new Date(friendEvent.endTime);
 
-            const notification2Id = generateId();
-            notifications[notification2Id] = {
-              id: notification2Id,
-              userId: friendId,
-              type: "hangout_match",
-              title: "Hangout Match Found!",
-              message: "You have an overlapping hangout time with a friend",
-              data: {
-                matchedUserId: event.userId,
-                overlappingTime: overlap,
-                hangoutEvents: [eventId, friendEvent.id],
-              },
-              read: false,
-              createdAt: new Date().toISOString(),
-            };
-          }
+        const overlapStart = new Date(
+          Math.max(eventStart.getTime(), friendStart.getTime()),
+        );
+        const overlapEnd = new Date(
+          Math.min(eventEnd.getTime(), friendEnd.getTime()),
+        );
+
+        if (overlapStart <= overlapEnd) {
+          // Create hangout match notifications
+          const overlap = {
+            start: overlapStart.toISOString(),
+            end: overlapEnd.toISOString(),
+          };
+
+          // Notify both users
+          await addDoc(collection(db, "notifications"), {
+            userId: event.userId,
+            type: "hangout_match",
+            title: "Hangout Match Found!",
+            message: "You have an overlapping hangout time with a friend",
+            data: {
+              matchedUserId: friendId,
+              overlappingTime: overlap,
+              hangoutEvents: [eventId, friendEventDoc.id],
+            },
+            read: false,
+            createdAt: serverTimestamp(),
+          });
+
+          await addDoc(collection(db, "notifications"), {
+            userId: friendId,
+            type: "hangout_match",
+            title: "Hangout Match Found!",
+            message: "You have an overlapping hangout time with a friend",
+            data: {
+              matchedUserId: event.userId,
+              overlappingTime: overlap,
+              hangoutEvents: [eventId, friendEventDoc.id],
+            },
+            read: false,
+            createdAt: serverTimestamp(),
+          });
         }
       });
     }
-
-    saveToStorage("notifications", notifications);
   } catch (error) {
     console.error("Error checking hangout overlaps:", error);
   }
@@ -472,36 +464,28 @@ export const sendMessage = async (
   content: string,
 ): Promise<boolean> => {
   try {
-    const messages = getFromStorage("messages") || {};
-    const messageId = generateId();
     const conversationId = [senderId, receiverId].sort().join("-");
 
-    messages[messageId] = {
-      id: messageId,
+    // Add message to messages collection
+    await addDoc(collection(db, "messages"), {
       senderId,
       receiverId,
       content,
       conversationId,
-      timestamp: new Date().toISOString(),
+      timestamp: serverTimestamp(),
       read: false,
-    };
-
-    saveToStorage("messages", messages);
+    });
 
     // Create notification for receiver
-    const notifications = getFromStorage("notifications") || {};
-    const notificationId = generateId();
-    notifications[notificationId] = {
-      id: notificationId,
+    await addDoc(collection(db, "notifications"), {
       userId: receiverId,
       type: "message",
       title: "New Message",
       message: "You received a new message",
       data: { senderId },
       read: false,
-      createdAt: new Date().toISOString(),
-    };
-    saveToStorage("notifications", notifications);
+      createdAt: serverTimestamp(),
+    });
 
     return true;
   } catch (error) {
@@ -514,31 +498,28 @@ export const getConversationMessages = (
   conversationId: string,
   callback: (messages: Message[]) => void,
 ) => {
-  const getMessages = () => {
-    const messages = getFromStorage("messages") || {};
-    const conversationMessages: Message[] = [];
+  const messagesQuery = query(
+    collection(db, "messages"),
+    where("conversationId", "==", conversationId),
+    orderBy("timestamp", "asc"),
+  );
 
-    Object.values(messages).forEach((message: any) => {
-      if (message.conversationId === conversationId) {
-        conversationMessages.push(message);
-      }
+  return onSnapshot(messagesQuery, (snapshot) => {
+    const messages: Message[] = [];
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      messages.push({
+        id: doc.id,
+        senderId: data.senderId,
+        receiverId: data.receiverId,
+        content: data.content,
+        timestamp:
+          data.timestamp?.toDate?.()?.toISOString() || new Date().toISOString(),
+        read: data.read,
+      });
     });
-
-    conversationMessages.sort(
-      (a, b) =>
-        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-    );
-    callback(conversationMessages);
-  };
-
-  // Initial load
-  getMessages();
-
-  // Simulate real-time updates
-  const interval = setInterval(getMessages, 1000);
-
-  // Return unsubscribe function
-  return () => clearInterval(interval);
+    callback(messages);
+  });
 };
 
 // Notifications
@@ -546,42 +527,40 @@ export const getUserNotifications = (
   userId: string,
   callback: (notifications: Notification[]) => void,
 ) => {
-  const getNotifications = () => {
-    const notifications = getFromStorage("notifications") || {};
-    const userNotifications: Notification[] = [];
+  const notificationsQuery = query(
+    collection(db, "notifications"),
+    where("userId", "==", userId),
+    orderBy("createdAt", "desc"),
+    limit(50),
+  );
 
-    Object.values(notifications).forEach((notification: any) => {
-      if (notification.userId === userId) {
-        userNotifications.push(notification);
-      }
+  return onSnapshot(notificationsQuery, (snapshot) => {
+    const notifications: Notification[] = [];
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      notifications.push({
+        id: doc.id,
+        userId: data.userId,
+        type: data.type,
+        title: data.title,
+        message: data.message,
+        data: data.data,
+        read: data.read,
+        createdAt:
+          data.createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+      });
     });
-
-    userNotifications.sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
-    callback(userNotifications.slice(0, 50));
-  };
-
-  // Initial load
-  getNotifications();
-
-  // Simulate real-time updates
-  const interval = setInterval(getNotifications, 2000);
-
-  // Return unsubscribe function
-  return () => clearInterval(interval);
+    callback(notifications);
+  });
 };
 
 export const markNotificationAsRead = async (
   notificationId: string,
 ): Promise<boolean> => {
   try {
-    const notifications = getFromStorage("notifications") || {};
-    if (notifications[notificationId]) {
-      notifications[notificationId].read = true;
-      saveToStorage("notifications", notifications);
-    }
+    await updateDoc(doc(db, "notifications", notificationId), {
+      read: true,
+    });
     return true;
   } catch (error) {
     console.error("Error marking notification as read:", error);

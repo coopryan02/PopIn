@@ -11,7 +11,6 @@ import {
   signInUser,
   signOutUser,
   onAuthStateChange,
-  simulateAuthStateChange,
 } from "@/services/firebase";
 
 interface AuthContextType extends AuthState {
@@ -39,9 +38,6 @@ export const useAuth = () => {
   return context;
 };
 
-// Session storage for current user
-const CURRENT_USER_KEY = "social_network_current_user";
-
 const useAuthStore = () => {
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -50,28 +46,10 @@ const useAuthStore = () => {
   });
 
   useEffect(() => {
-    // Check for existing session
-    const savedUser = localStorage.getItem(CURRENT_USER_KEY);
-    if (savedUser) {
-      try {
-        const user = JSON.parse(savedUser);
-        setState({
-          user,
-          isAuthenticated: true,
-          isLoading: false,
-        });
-        simulateAuthStateChange(user);
-      } catch (error) {
-        console.error("Error loading saved user:", error);
-        localStorage.removeItem(CURRENT_USER_KEY);
-        setState((prev) => ({ ...prev, isLoading: false }));
-      }
-    } else {
-      setState((prev) => ({ ...prev, isLoading: false }));
-    }
-
-    // Listen to auth state changes
+    console.log("Setting up auth state listener...");
+    // Listen to Firebase auth state changes
     const unsubscribe = onAuthStateChange((user) => {
+      console.log("Auth state changed:", user?.id || "null");
       setState({
         user,
         isAuthenticated: !!user,
@@ -79,37 +57,36 @@ const useAuthStore = () => {
       });
     });
 
-    return () => unsubscribe();
+    return () => {
+      console.log("Cleaning up auth state listener");
+      unsubscribe();
+    };
   }, []);
 
   const login = async (
     email: string,
     password: string,
   ): Promise<{ success: boolean; error?: string }> => {
+    console.log("Login attempt:", email);
     setState((prev) => ({ ...prev, isLoading: true }));
 
     try {
       const result = await signInUser(email, password);
+      console.log("Login result:", result);
 
       if (result.success && result.user) {
-        // Save to session storage
-        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(result.user));
-
         setState({
           user: result.user,
           isAuthenticated: true,
           isLoading: false,
         });
-
-        // Simulate auth state change
-        simulateAuthStateChange(result.user);
-
         return { success: true };
       } else {
         setState((prev) => ({ ...prev, isLoading: false }));
         return { success: false, error: result.error || "Login failed" };
       }
     } catch (error: any) {
+      console.error("Login error:", error);
       setState((prev) => ({ ...prev, isLoading: false }));
       return {
         success: false,
@@ -124,6 +101,7 @@ const useAuthStore = () => {
     username: string,
     fullName: string,
   ): Promise<{ success: boolean; error?: string }> => {
+    console.log("Register attempt:", { email, username, fullName });
     setState((prev) => ({ ...prev, isLoading: true }));
 
     try {
@@ -133,26 +111,21 @@ const useAuthStore = () => {
         username,
         fullName,
       );
+      console.log("Register result:", result);
 
       if (result.success && result.user) {
-        // Save to session storage
-        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(result.user));
-
         setState({
           user: result.user,
           isAuthenticated: true,
           isLoading: false,
         });
-
-        // Simulate auth state change
-        simulateAuthStateChange(result.user);
-
         return { success: true };
       } else {
         setState((prev) => ({ ...prev, isLoading: false }));
         return { success: false, error: result.error || "Registration failed" };
       }
     } catch (error: any) {
+      console.error("Register error:", error);
       setState((prev) => ({ ...prev, isLoading: false }));
       return {
         success: false,
@@ -162,23 +135,23 @@ const useAuthStore = () => {
   };
 
   const logout = async () => {
+    console.log("Logout attempt");
     try {
       await signOutUser();
-      localStorage.removeItem(CURRENT_USER_KEY);
       setState({
         user: null,
         isAuthenticated: false,
         isLoading: false,
       });
-      simulateAuthStateChange(null);
+      console.log("Logout successful");
     } catch (error) {
       console.error("Logout error:", error);
     }
   };
 
   const updateUser = (user: User) => {
+    console.log("Updating user:", user);
     setState((prev) => ({ ...prev, user: { ...user } }));
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
   };
 
   return {
