@@ -1,15 +1,15 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getAuth, connectAuthEmulator } from "firebase/auth";
+import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 
-// Real Firebase configuration - using a demo project that works
+// Demo Firebase configuration for emulator
 const firebaseConfig = {
-  apiKey: "AIzaSyDxQV_-X0ZO8dQKdSGe8YYQo0aEHhOFWAQ",
-  authDomain: "social-network-demo-24.firebaseapp.com",
-  projectId: "social-network-demo-24",
-  storageBucket: "social-network-demo-24.appspot.com",
+  apiKey: "demo-api-key",
+  authDomain: "demo-project.firebaseapp.com",
+  projectId: "demo-project",
+  storageBucket: "demo-project.appspot.com",
   messagingSenderId: "123456789012",
-  appId: "1:123456789012:web:abcdef1234567890123456",
+  appId: "1:123456789012:web:demo-app-id",
 };
 
 // Initialize Firebase
@@ -20,5 +20,26 @@ export const auth = getAuth(app);
 
 // Initialize Firestore
 export const db = getFirestore(app);
+
+// Connect to emulators in development
+if (import.meta.env.DEV) {
+  try {
+    // Connect to Auth emulator
+    connectAuthEmulator(auth, "http://localhost:9099", {
+      disableWarnings: true,
+    });
+    console.log("Connected to Firebase Auth emulator");
+  } catch (error) {
+    console.warn("Auth emulator already connected or not available");
+  }
+
+  try {
+    // Connect to Firestore emulator
+    connectFirestoreEmulator(db, "localhost", 8080);
+    console.log("Connected to Firestore emulator");
+  } catch (error) {
+    console.warn("Firestore emulator already connected or not available");
+  }
+}
 
 export { app };
