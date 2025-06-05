@@ -6,8 +6,12 @@ import {
   ReactNode,
 } from "react";
 import { AuthState, User } from "@/types";
-import { userStorage } from "@/utils/storage";
-import { authenticateUser, registerUser } from "@/utils/auth";
+import {
+  createUserAccount,
+  signInUser,
+  signOutUser,
+  onAuthStateChange,
+} from "@/services/firebase";
 
 interface AuthContextType extends AuthState {
   login: (
@@ -42,13 +46,16 @@ const useAuthStore = () => {
   });
 
   useEffect(() => {
-    // Check if user is already logged in
-    const currentUser = userStorage.getCurrentUser();
-    setState({
-      user: currentUser,
-      isAuthenticated: !!currentUser,
-      isLoading: false,
+    // Listen to Firebase auth state changes
+    const unsubscribe = onAuthStateChange((user) => {
+      setState({
+        user,
+        isAuthenticated: !!user,
+        isLoading: false,
+      });
     });
+
+    return () => unsubscribe();
   }, []);
 
   const login = async (
@@ -58,23 +65,25 @@ const useAuthStore = () => {
     setState((prev) => ({ ...prev, isLoading: true }));
 
     try {
-      const user = authenticateUser(email, password);
+      const result = await signInUser(email, password);
 
-      if (user) {
-        userStorage.setCurrentUser(user);
+      if (result.success && result.user) {
         setState({
-          user,
+          user: result.user,
           isAuthenticated: true,
           isLoading: false,
         });
         return { success: true };
       } else {
         setState((prev) => ({ ...prev, isLoading: false }));
-        return { success: false, error: "Invalid email or password" };
+        return { success: false, error: result.error || "Login failed" };
       }
-    } catch (error) {
+    } catch (error: any) {
       setState((prev) => ({ ...prev, isLoading: false }));
-      return { success: false, error: "Login failed. Please try again." };
+      return {
+        success: false,
+        error: error.message || "Login failed. Please try again.",
+      };
     }
   };
 
@@ -87,10 +96,14 @@ const useAuthStore = () => {
     setState((prev) => ({ ...prev, isLoading: true }));
 
     try {
-      const result = registerUser(email, password, username, fullName);
+      const result = await createUserAccount(
+        email,
+        password,
+        username,
+        fullName,
+      );
 
       if (result.success && result.user) {
-        userStorage.setCurrentUser(result.user);
         setState({
           user: result.user,
           isAuthenticated: true,
@@ -99,29 +112,31 @@ const useAuthStore = () => {
         return { success: true };
       } else {
         setState((prev) => ({ ...prev, isLoading: false }));
-        return { success: false, error: result.error };
+        return { success: false, error: result.error || "Registration failed" };
       }
-    } catch (error) {
+    } catch (error: any) {
       setState((prev) => ({ ...prev, isLoading: false }));
       return {
         success: false,
-        error: "Registration failed. Please try again.",
+        error: error.message || "Registration failed. Please try again.",
       };
     }
   };
 
-  const logout = () => {
-    userStorage.setCurrentUser(null);
-    setState({
-      user: null,
-      isAuthenticated: false,
-      isLoading: false,
-    });
+  const logout = async () => {
+    try {
+      await signOutUser();
+      setState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+      });
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
   };
 
   const updateUser = (user: User) => {
-    userStorage.updateUser(user);
-    userStorage.setCurrentUser(user);
     setState((prev) => ({ ...prev, user: { ...user } }));
   };
 
