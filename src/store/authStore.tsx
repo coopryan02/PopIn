@@ -11,6 +11,7 @@ import {
   signInUser,
   signOutUser,
   onAuthStateChange,
+  simulateAuthStateChange,
 } from "@/services/firebase";
 
 interface AuthContextType extends AuthState {
@@ -24,7 +25,7 @@ interface AuthContextType extends AuthState {
     username: string,
     fullName: string,
   ) => Promise<{ success: boolean; error?: string }>;
-  logout: () => void;
+  logout: () => Promise<void>;
   updateUser: (user: User) => void;
 }
 
@@ -38,6 +39,9 @@ export const useAuth = () => {
   return context;
 };
 
+// Session storage for current user
+const CURRENT_USER_KEY = "social_network_current_user";
+
 const useAuthStore = () => {
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -46,7 +50,27 @@ const useAuthStore = () => {
   });
 
   useEffect(() => {
-    // Listen to Firebase auth state changes
+    // Check for existing session
+    const savedUser = localStorage.getItem(CURRENT_USER_KEY);
+    if (savedUser) {
+      try {
+        const user = JSON.parse(savedUser);
+        setState({
+          user,
+          isAuthenticated: true,
+          isLoading: false,
+        });
+        simulateAuthStateChange(user);
+      } catch (error) {
+        console.error("Error loading saved user:", error);
+        localStorage.removeItem(CURRENT_USER_KEY);
+        setState((prev) => ({ ...prev, isLoading: false }));
+      }
+    } else {
+      setState((prev) => ({ ...prev, isLoading: false }));
+    }
+
+    // Listen to auth state changes
     const unsubscribe = onAuthStateChange((user) => {
       setState({
         user,
@@ -68,11 +92,18 @@ const useAuthStore = () => {
       const result = await signInUser(email, password);
 
       if (result.success && result.user) {
+        // Save to session storage
+        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(result.user));
+
         setState({
           user: result.user,
           isAuthenticated: true,
           isLoading: false,
         });
+
+        // Simulate auth state change
+        simulateAuthStateChange(result.user);
+
         return { success: true };
       } else {
         setState((prev) => ({ ...prev, isLoading: false }));
@@ -104,11 +135,18 @@ const useAuthStore = () => {
       );
 
       if (result.success && result.user) {
+        // Save to session storage
+        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(result.user));
+
         setState({
           user: result.user,
           isAuthenticated: true,
           isLoading: false,
         });
+
+        // Simulate auth state change
+        simulateAuthStateChange(result.user);
+
         return { success: true };
       } else {
         setState((prev) => ({ ...prev, isLoading: false }));
@@ -126,11 +164,13 @@ const useAuthStore = () => {
   const logout = async () => {
     try {
       await signOutUser();
+      localStorage.removeItem(CURRENT_USER_KEY);
       setState({
         user: null,
         isAuthenticated: false,
         isLoading: false,
       });
+      simulateAuthStateChange(null);
     } catch (error) {
       console.error("Logout error:", error);
     }
@@ -138,6 +178,7 @@ const useAuthStore = () => {
 
   const updateUser = (user: User) => {
     setState((prev) => ({ ...prev, user: { ...user } }));
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
   };
 
   return {
