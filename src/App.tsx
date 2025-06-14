@@ -15,6 +15,7 @@ import Messages from "./pages/Messages";
 import Friends from "./pages/Friends";
 import FriendHangouts from "./pages/FriendHangouts";
 import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -95,8 +96,16 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <Settings />
+          </ProtectedRoute>
+        }
+      />
 
-      {/* Root redirect */}
+      {/* Root redirect */>
       <Route
         path="/"
         element={
