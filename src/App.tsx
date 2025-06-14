@@ -105,7 +105,7 @@ const AppRoutes = () => {
         }
       />
 
-      {/* Root redirect */>
+      {/* Root redirect */}
       <Route
         path="/"
         element={
